@@ -1,6 +1,9 @@
 from math import cos, sin
 from random import randint
 
+# TODO: Add add more complex angle change on ball collision with player
+# TODO: Add scoring
+
 # ImportError thrown when pygame is not installed
 try:
     import pygame
@@ -31,7 +34,7 @@ PLAYER_COLOUR = (255, 255, 255)  # White
 
 # Constants for the ball
 BALL_RADIUS = 5
-BALL_VELOCITY = 7
+BALL_VELOCITY = 10
 BALL_COLOUR = (255, 255, 255)  # White
 BALL_CONE = 60  # 0.6 radians (approx 35 degrees)
 PI = 3.14159  # Allows calculations using radians
@@ -42,6 +45,7 @@ class Player:
         # Starting x,y for player1
         self.x = x
         self.y = y
+        self.points = 0
 
     def draw(self, win):
         # Draws a white rectangle at specified co-ords
@@ -83,9 +87,37 @@ class Ball:
         # Draws a white circle
         pygame.draw.circle(win, BALL_COLOUR, (self.x, self.y), BALL_RADIUS)
 
-    def move(self):
-        self.x += int(BALL_VELOCITY * cos(self.angle))
-        self.y -= int(BALL_VELOCITY * sin(self.angle))
+    def move(self, player1, player2):
+        next_x = self.x + int(BALL_VELOCITY * cos(self.angle))
+        next_y = self.y - int(BALL_VELOCITY * sin(self.angle))
+
+        # Hitting top/bottom
+        if next_y <= 0 or next_y >= WIN_HEIGHT:
+            self.angle = -self.angle
+            self.move(player1, player2)
+
+        # Hitting player 1
+        elif next_x <= player1.x + PLAYER_WIDTH and player1.y <= self.y <= player1.y + PLAYER_HEIGHT:
+            self.angle = PI - self.angle
+            self.move(player1, player2)
+
+        # Hitting player 2
+        elif next_x >= player2.x and player2.y <= self.y <= player2.y + PLAYER_HEIGHT:
+            self.angle = PI - self.angle
+            self.move(player1, player2)
+
+        # Gone past player 1
+        elif next_x <= 0:
+            player2.points += 1
+
+        # Gone past player 2
+        elif next_x >= WIN_WIDTH:
+            player1.points += 2
+
+        # Normal movement
+        else:
+            self.x = next_x
+            self.y = next_y
 
 
 def main():
@@ -130,7 +162,7 @@ def main():
             player2.move_down()
 
         # Ball movement
-        ball.move()
+        ball.move(player1, player2)
 
         # Draws a black background
         win.fill(SCREEN_COLOUR)
