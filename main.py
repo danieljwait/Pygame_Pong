@@ -1,4 +1,5 @@
 from math import cos, sin
+from random import randint
 
 # ImportError thrown when pygame is not installed
 try:
@@ -25,13 +26,15 @@ LINE_X = int(WIN_WIDTH / 2)
 PLAYER_WIDTH = 10
 PLAYER_HEIGHT = 75
 PLAYER_VELOCITY = 10
+PLAYER_OFFSET = 10
 PLAYER_COLOUR = (255, 255, 255)  # White
 
 # Constants for the ball
 BALL_RADIUS = 5
-BALL_VELOCITY = 5
+BALL_VELOCITY = 7
 BALL_COLOUR = (255, 255, 255)  # White
-PI = 3.14159
+BALL_CONE = 60  # 0.6 radians (approx 35 degrees)
+PI = 3.14159  # Allows calculations using radians
 
 
 class Player:
@@ -67,25 +70,22 @@ class Ball:
         self.x = int(WIN_WIDTH / 2)
         self.y = int(WIN_HEIGHT / 2)
 
+        # Chooses random starting angle for the ball
+        # 1.2 radian (~70 degrees) cone to the left or right
+        # https://www.desmos.com/calculator/4lj2bek1dg
+        direction = randint(0, 1)
+        if direction == 0:  # Left
+            self.angle = randint(-BALL_CONE, BALL_CONE) / 100
+        else:  # Right
+            self.angle = randint(-BALL_CONE, BALL_CONE) / 100 + PI
+
     def draw(self, win):
         # Draws a white circle
         pygame.draw.circle(win, BALL_COLOUR, (self.x, self.y), BALL_RADIUS)
 
-    # TODO: NOT WORKING!
-    def move(self, angle):
-        if PI/2 > angle >= 0:
-            self.x += int(BALL_VELOCITY * cos(angle))
-            self.y -= int(BALL_VELOCITY * sin(angle))
-        elif PI > angle >= PI/2:
-            self.x -= int(BALL_VELOCITY * cos(angle))
-            self.y -= int(BALL_VELOCITY * sin(angle))
-        elif 3*PI/2 > angle >= PI:
-            self.x -= int(BALL_VELOCITY * cos(angle))
-            self.y += int(BALL_VELOCITY * sin(angle))
-        else:
-            self.x += int(BALL_VELOCITY * cos(angle))
-            self.y += int(BALL_VELOCITY * sin(angle))
-
+    def move(self):
+        self.x += int(BALL_VELOCITY * cos(self.angle))
+        self.y -= int(BALL_VELOCITY * sin(self.angle))
 
 
 def main():
@@ -95,8 +95,8 @@ def main():
     pygame.display.set_caption("Pong")
 
     # Creates objects for both players
-    player1 = Player(10, 10)
-    player2 = Player(WIN_WIDTH - PLAYER_WIDTH - 10, 10)
+    player1 = Player(PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
+    player2 = Player(WIN_WIDTH - PLAYER_WIDTH - PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
 
     # Creates objects for the ball
     ball = Ball()
@@ -130,8 +130,7 @@ def main():
             player2.move_down()
 
         # Ball movement
-        ball.move(3)
-        # TODO: TRY DIFFERENT VALUES
+        ball.move()
 
         # Draws a black background
         win.fill(SCREEN_COLOUR)
