@@ -1,6 +1,3 @@
-from math import cos, sin
-from random import randint
-
 # TODO: Add add more complex angle change on ball collision with player
 # TODO: Add scoring
 
@@ -15,6 +12,9 @@ except ImportError:
     check_call([executable, "-m", "pip", "install", "pygame"])
     import pygame
     pygame.init()
+
+from math import cos, sin
+from random import randint
 
 # Constants for the window
 WIN_WIDTH = 800
@@ -45,7 +45,6 @@ class Player:
         # Starting x,y for player1
         self.x = x
         self.y = y
-        self.points = 0
 
     def draw(self, win):
         # Draws a white rectangle at specified co-ords
@@ -87,37 +86,97 @@ class Ball:
         # Draws a white circle
         pygame.draw.circle(win, BALL_COLOUR, (self.x, self.y), BALL_RADIUS)
 
-    def move(self, player1, player2):
+    def move(self, game, player1, player2):
         next_x = self.x + int(BALL_VELOCITY * cos(self.angle))
         next_y = self.y - int(BALL_VELOCITY * sin(self.angle))
 
         # Hitting top/bottom
         if next_y <= 0 or next_y >= WIN_HEIGHT:
             self.angle = -self.angle
-            self.move(player1, player2)
+            self.move(game, player1, player2)
 
         # Hitting player 1
         elif next_x <= player1.x + PLAYER_WIDTH and player1.y <= self.y <= player1.y + PLAYER_HEIGHT:
             self.angle = PI - self.angle
-            self.move(player1, player2)
+            self.move(game, player1, player2)
 
         # Hitting player 2
         elif next_x >= player2.x and player2.y <= self.y <= player2.y + PLAYER_HEIGHT:
             self.angle = PI - self.angle
-            self.move(player1, player2)
+            self.move(game, player1, player2)
 
         # Gone past player 1
         elif next_x <= 0:
-            player2.points += 1
+            game.score[1] += 1
+            game.run = False
 
         # Gone past player 2
         elif next_x >= WIN_WIDTH:
-            player1.points += 2
+            game.score[0] += 1
+            game.run = False
 
         # Normal movement
         else:
             self.x = next_x
             self.y = next_y
+
+
+class Game:
+    def __init__(self):
+        self.run = True
+        self.score = [0, 0]
+
+    def game_loop(self, win, player1, player2, ball):
+        while self.run:
+            # The set delay between each tick/frame
+            # Game has a frame time of 40ms so 25fps
+            pygame.time.delay(40)
+
+            # Gets list of events in that tick
+            for event in pygame.event.get():
+                # Ends game loop when QUIT event is triggered
+                if event.type == pygame.QUIT:
+                    self.run = False
+
+            # Gets a list of all the keys pressed in that tick
+            keys = pygame.key.get_pressed()
+
+            # Player 1 movement
+            if keys[pygame.K_w]:
+                player1.move_up()
+            if keys[pygame.K_s]:
+                player1.move_down()
+
+            # Player 2 movement
+            if keys[pygame.K_UP]:
+                player2.move_up()
+            if keys[pygame.K_DOWN]:
+                player2.move_down()
+
+            # Ball movement
+            ball.move(self, player1, player2)
+
+            # Draws a black background
+            win.fill(SCREEN_COLOUR)
+            # Draws the centre line
+            pygame.draw.line(win, LINE_COLOUR, (LINE_X, 0), (LINE_X, WIN_HEIGHT))
+            # Draws the players
+            player1.draw(win)
+            player2.draw(win)
+            # Draws the ball
+            ball.draw(win)
+
+            # Refreshes the display
+            pygame.display.update()
+
+    def no_winner(self):
+        # When somebody has reached 5 points (won the game)
+        if max(self.score[0], self.score[1]) == 5:
+            return False
+        else:
+            # Enables the game loop to be run again
+            self.run = True
+            return True
 
 
 def main():
@@ -126,56 +185,21 @@ def main():
     # Sets the name of the game window
     pygame.display.set_caption("Pong")
 
-    # Creates objects for both players
-    player1 = Player(PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
-    player2 = Player(WIN_WIDTH - PLAYER_WIDTH - PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
+    # Creates objects for the game loop
+    game = Game()
 
-    # Creates objects for the ball
-    ball = Ball()
+    # Loops until somebody has scored 5 points
+    while game.no_winner():
+        # Creates objects for both players
+        player1 = Player(PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
+        player2 = Player(WIN_WIDTH - PLAYER_WIDTH - PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
 
-    # Main game loop will run until QUIT event
-    run = True
-    while run:
-        # The set delay between each tick/frame
-        # Game has a frame time of 40ms so 25fps
-        pygame.time.delay(40)
+        # Creates object for the ball
+        ball = Ball()
 
-        # Gets list of events in that tick
-        for event in pygame.event.get():
-            # Ends game loop when QUIT event is triggered
-            if event.type == pygame.QUIT:
-                run = False
-
-        # Gets a list of all the keys pressed in that tick
-        keys = pygame.key.get_pressed()
-
-        # Player 1 movement
-        if keys[pygame.K_w]:
-            player1.move_up()
-        if keys[pygame.K_s]:
-            player1.move_down()
-
-        # Player 2 movement
-        if keys[pygame.K_UP]:
-            player2.move_up()
-        if keys[pygame.K_DOWN]:
-            player2.move_down()
-
-        # Ball movement
-        ball.move(player1, player2)
-
-        # Draws a black background
-        win.fill(SCREEN_COLOUR)
-        # Draws the centre line
-        pygame.draw.line(win, LINE_COLOUR, (LINE_X, 0), (LINE_X, WIN_HEIGHT))
-        # Draws the players
-        player1.draw(win)
-        player2.draw(win)
-        # Draws the ball
-        ball.draw(win)
-
-        # Refreshes the display
-        pygame.display.update()
+        # Game loop will run until QUIT event
+        game.game_loop(win, player1, player2, ball)
+        print(game.score)
 
 
 if __name__ == '__main__':
