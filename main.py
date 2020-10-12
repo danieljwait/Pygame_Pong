@@ -1,43 +1,52 @@
 # TODO: Add add more complex angle change on ball collision with player
-# TODO: Add scoring
 
 # ImportError thrown when pygame is not installed
 try:
     import pygame
+    import pygame.freetype
+
     pygame.init()
 # When pygame is not installed, it will install it using pip
 except ImportError:
     from sys import executable
     from subprocess import check_call
+
     check_call([executable, "-m", "pip", "install", "pygame"])
     import pygame
+    import pygame.freetype
+
     pygame.init()
 
 from math import cos, sin
 from random import randint
+import time
+
+# Constants for colours
+COLOUR_WHITE = (255, 255, 255)
+COLOUR_GREY = (100, 100, 100)
+COLOUR_BLACK = (0, 0, 0)
 
 # Constants for the window
 WIN_WIDTH = 800
 WIN_HEIGHT = 600
 
 # Constants for the background
-SCREEN_COLOUR = (0, 0, 0)  # Black
-LINE_COLOUR = (100, 100, 100)  # Grey
 LINE_X = int(WIN_WIDTH / 2)
+SCORE_FONT_SIZE = 90  # Width = 0.5 * Size and Height = 0.75 * Size
+SCORE_FONT_WIDTH = int(SCORE_FONT_SIZE * 0.5)
+SCORE_FONT = pygame.freetype.SysFont("Courier New Bold", SCORE_FONT_SIZE)
 
 # Constants for the players
 PLAYER_WIDTH = 10
 PLAYER_HEIGHT = 75
-PLAYER_VELOCITY = 10
+PLAYER_VELOCITY = 475
 PLAYER_OFFSET = 10
-PLAYER_COLOUR = (255, 255, 255)  # White
 
 # Constants for the ball
 BALL_RADIUS = 5
-BALL_VELOCITY = 10
-BALL_COLOUR = (255, 255, 255)  # White
-BALL_CONE = 60  # 0.6 radians (approx 35 degrees)
+BALL_VELOCITY = 450
 PI = 3.14159  # Allows calculations using radians
+BALL_CONE = int(PI / 12 * 100)  # ~0.26 radians, cone is ~0.51 radians wide (30 degrees)
 
 
 class Player:
@@ -47,24 +56,24 @@ class Player:
         self.y = y
 
     def draw(self, win):
-        # Draws a white rectangle at specified co-ords
-        pygame.draw.rect(win, PLAYER_COLOUR, (self.x, self.y, PLAYER_WIDTH, PLAYER_HEIGHT))
+        # Draws a player (surface, colour, (x, y, width, height))
+        pygame.draw.rect(win, COLOUR_WHITE, (self.x, self.y, PLAYER_WIDTH, PLAYER_HEIGHT))
 
-    def move_up(self):
+    def move_up(self, game):
         # When moving up would move player off the screen
         # Only move to top of screen
-        if self.y - PLAYER_VELOCITY < 0:
+        if int(self.y - (PLAYER_VELOCITY * game.delta_time)) < 0:
             self.y = 0
         else:
-            self.y -= PLAYER_VELOCITY
+            self.y -= int(PLAYER_VELOCITY * game.delta_time)
 
-    def move_down(self):
+    def move_down(self, game):
         # When moving down would move player off the screen
         # Only move to bottom of screen
-        if self.y + PLAYER_HEIGHT + PLAYER_VELOCITY > WIN_HEIGHT:
+        if int(self.y + PLAYER_HEIGHT + (PLAYER_VELOCITY * game.delta_time)) > WIN_HEIGHT:
             self.y = WIN_HEIGHT - PLAYER_HEIGHT
         else:
-            self.y += PLAYER_VELOCITY
+            self.y += int(PLAYER_VELOCITY * game.delta_time)
 
 
 class Ball:
@@ -83,12 +92,12 @@ class Ball:
             self.angle = randint(-BALL_CONE, BALL_CONE) / 100 + PI
 
     def draw(self, win):
-        # Draws a white circle
-        pygame.draw.circle(win, BALL_COLOUR, (self.x, self.y), BALL_RADIUS)
+        # Draws a white circle (surface, colour, pos, radius)
+        pygame.draw.circle(win, COLOUR_WHITE, (self.x, self.y), BALL_RADIUS)
 
     def move(self, game, player1, player2):
-        next_x = self.x + int(BALL_VELOCITY * cos(self.angle))
-        next_y = self.y - int(BALL_VELOCITY * sin(self.angle))
+        next_x = self.x + int(BALL_VELOCITY * cos(self.angle) * game.delta_time)
+        next_y = self.y - int(BALL_VELOCITY * sin(self.angle) * game.delta_time)
 
         # Hitting top/bottom
         if next_y <= 0 or next_y >= WIN_HEIGHT:
@@ -124,18 +133,31 @@ class Ball:
 class Game:
     def __init__(self):
         self.run = True
+        self.exit = False
         self.score = [0, 0]
+
+        # Used to calculate delta time
+        # (declaration for delta_time and time_now, values of not significance)
+        self.delta_time = 0
+        self.time_now = 0
+        self.time_last = time.process_time()
 
     def game_loop(self, win, player1, player2, ball):
         while self.run:
+            # Delta time used for consistent movement across frames
+            self.get_delta_time()
+            print(self.delta_time)
+
             # The set delay between each tick/frame
-            # Game has a frame time of 40ms so 25fps
-            pygame.time.delay(40)
+            # Game has a frame time of 20ms so 50fps
+            # 1000ms / 20ms = 50fps
+            pygame.time.delay(20)
 
             # Gets list of events in that tick
             for event in pygame.event.get():
                 # Ends game loop when QUIT event is triggered
                 if event.type == pygame.QUIT:
+                    self.exit = True
                     self.run = False
 
             # Gets a list of all the keys pressed in that tick
@@ -143,23 +165,25 @@ class Game:
 
             # Player 1 movement
             if keys[pygame.K_w]:
-                player1.move_up()
+                player1.move_up(self)
             if keys[pygame.K_s]:
-                player1.move_down()
+                player1.move_down(self)
 
             # Player 2 movement
             if keys[pygame.K_UP]:
-                player2.move_up()
+                player2.move_up(self)
             if keys[pygame.K_DOWN]:
-                player2.move_down()
+                player2.move_down(self)
 
             # Ball movement
             ball.move(self, player1, player2)
 
             # Draws a black background
-            win.fill(SCREEN_COLOUR)
-            # Draws the centre line
-            pygame.draw.line(win, LINE_COLOUR, (LINE_X, 0), (LINE_X, WIN_HEIGHT))
+            win.fill(COLOUR_BLACK)
+            # Draws the centre line (surface, colour, pos, dimensions)
+            pygame.draw.line(win, COLOUR_GREY, (LINE_X, 0), (LINE_X, WIN_HEIGHT))
+            # Draws the score
+            self.draw_score(win)
             # Draws the players
             player1.draw(win)
             player2.draw(win)
@@ -168,6 +192,22 @@ class Game:
 
             # Refreshes the display
             pygame.display.update()
+
+    def get_delta_time(self):
+        # Time current frame started
+        self.time_now = time.perf_counter()
+
+        # Delta time is time taken for last frame to process
+        self.delta_time = (self.time_now - self.time_last)
+
+        # Switches ready for next use
+        self.time_last = self.time_now
+
+    def draw_score(self, win):
+        # Draws player 1's score (surface, pos, text, colour)
+        SCORE_FONT.render_to(win, (int(WIN_WIDTH / 2) - SCORE_FONT_WIDTH * 2, 40), str(self.score[0]), COLOUR_GREY)
+        # Draws player 2's score
+        SCORE_FONT.render_to(win, (int(WIN_WIDTH / 2) + SCORE_FONT_WIDTH, 40), str(self.score[1]), COLOUR_GREY)
 
     def no_winner(self):
         # When somebody has reached 5 points (won the game)
@@ -189,8 +229,8 @@ def main():
     game = Game()
 
     # Loops until somebody has scored 5 points
-    while game.no_winner():
-        # Creates objects for both players
+    while game.no_winner() and not game.exit:
+        # Creates objects for both players (starting x, starting y)
         player1 = Player(PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
         player2 = Player(WIN_WIDTH - PLAYER_WIDTH - PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
 
