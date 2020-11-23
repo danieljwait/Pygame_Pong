@@ -19,7 +19,7 @@ except ImportError:
 
 from math import cos, sin
 from random import randint
-import time
+from time import process_time, perf_counter
 
 # Constants for colours
 COLOUR_WHITE = (255, 255, 255)
@@ -55,11 +55,11 @@ class Player:
         self.x = x
         self.y = y
 
-    def draw(self, win):
+    def draw(self, win) -> None:
         # Draws a player (surface, colour, (x, y, width, height))
         pygame.draw.rect(win, COLOUR_WHITE, (self.x, self.y, PLAYER_WIDTH, PLAYER_HEIGHT))
 
-    def move_up(self, game):
+    def move_up(self, game) -> None:
         # When moving up would move player off the screen
         # Only move to top of screen
         if int(self.y - (PLAYER_VELOCITY * game.delta_time)) < 0:
@@ -67,7 +67,7 @@ class Player:
         else:
             self.y -= int(PLAYER_VELOCITY * game.delta_time)
 
-    def move_down(self, game):
+    def move_down(self, game) -> None:
         # When moving down would move player off the screen
         # Only move to bottom of screen
         if int(self.y + PLAYER_HEIGHT + (PLAYER_VELOCITY * game.delta_time)) > WIN_HEIGHT:
@@ -91,13 +91,15 @@ class Ball:
         else:  # Right
             self.angle = randint(-BALL_CONE, BALL_CONE) / 100 + PI
 
-    def draw(self, win):
+    def draw(self, win) -> None:
         # Draws a white circle (surface, colour, pos, radius)
         pygame.draw.circle(win, COLOUR_WHITE, (self.x, self.y), BALL_RADIUS)
 
-    def move(self, game, player1, player2):
+    def move(self, game, player1, player2) -> None:
         next_x = self.x + int(BALL_VELOCITY * cos(self.angle) * game.delta_time)
         next_y = self.y - int(BALL_VELOCITY * sin(self.angle) * game.delta_time)
+
+        # FIXME: next_y problem is negative
 
         # Hitting top/bottom
         if next_y <= 0 or next_y >= WIN_HEIGHT:
@@ -137,16 +139,16 @@ class Game:
         self.score = [0, 0]
 
         # Used to calculate delta time
-        # (declaration for delta_time and time_now, values of not significance)
-        self.delta_time = 0
-        self.time_now = 0
-        self.time_last = time.process_time()
+        # (just declaration, values of no significance)
+        self.delta_time, self.time_now, self.time_last = 0, 0, 0
 
-    def game_loop(self, win, player1, player2, ball):
+    def game_loop(self, win, player1, player2, ball) -> None:
+        # Measures the start of the first frame to calculate the first delta time
+        self.time_last = process_time()
+
         while self.run:
             # Delta time used for consistent movement across frames
             self.get_delta_time()
-            print(self.delta_time)
 
             # The set delay between each tick/frame
             # Game has a frame time of 20ms so 50fps
@@ -193,9 +195,9 @@ class Game:
             # Refreshes the display
             pygame.display.update()
 
-    def get_delta_time(self):
+    def get_delta_time(self) -> None:
         # Time current frame started
-        self.time_now = time.perf_counter()
+        self.time_now = perf_counter()
 
         # Delta time is time taken for last frame to process
         self.delta_time = (self.time_now - self.time_last)
@@ -203,13 +205,13 @@ class Game:
         # Switches ready for next use
         self.time_last = self.time_now
 
-    def draw_score(self, win):
+    def draw_score(self, win) -> None:
         # Draws player 1's score (surface, pos, text, colour)
         SCORE_FONT.render_to(win, (int(WIN_WIDTH / 2) - SCORE_FONT_WIDTH * 2, 40), str(self.score[0]), COLOUR_GREY)
         # Draws player 2's score
         SCORE_FONT.render_to(win, (int(WIN_WIDTH / 2) + SCORE_FONT_WIDTH, 40), str(self.score[1]), COLOUR_GREY)
 
-    def no_winner(self):
+    def no_winner(self) -> bool:
         # When somebody has reached 5 points (won the game)
         if max(self.score[0], self.score[1]) == 5:
             return False
@@ -219,7 +221,7 @@ class Game:
             return True
 
 
-def main():
+def main() -> None:
     # Creates the game window
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
     # Sets the name of the game window
