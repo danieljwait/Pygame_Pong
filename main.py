@@ -11,7 +11,7 @@ except ImportError:
     from sys import executable
     from subprocess import check_call
 
-    check_call([executable, "-m", "pip", "install", "pygame"])
+    check_call([executable, "-m", "pip", "install", "--user", "pygame==1.9.6"])
     import pygame
     import pygame.freetype
 
@@ -19,7 +19,7 @@ except ImportError:
 
 from math import cos, sin
 from random import randint
-from time import process_time, perf_counter
+from time import perf_counter
 
 # Constants for colours
 COLOUR_WHITE = (255, 255, 255)
@@ -99,8 +99,6 @@ class Ball:
         next_x = self.x + int(BALL_VELOCITY * cos(self.angle) * game.delta_time)
         next_y = self.y - int(BALL_VELOCITY * sin(self.angle) * game.delta_time)
 
-        # FIXME: next_y problem is negative
-
         # Hitting top/bottom
         if next_y <= 0 or next_y >= WIN_HEIGHT:
             self.angle = -self.angle
@@ -144,16 +142,16 @@ class Game:
 
     def game_loop(self, win, player1, player2, ball) -> None:
         # Measures the start of the first frame to calculate the first delta time
-        self.time_last = process_time()
+        self.time_last = perf_counter()
 
         while self.run:
             # Delta time used for consistent movement across frames
             self.get_delta_time()
 
             # The set delay between each tick/frame
-            # Game has a frame time of 20ms so 50fps
-            # 1000ms / 20ms = 50fps
-            pygame.time.delay(20)
+            # Game has a frame time of 10ms so 100fps
+            # 1000ms / 10ms = 100fps
+            pygame.time.delay(10)
 
             # Gets list of events in that tick
             for event in pygame.event.get():
@@ -211,14 +209,14 @@ class Game:
         # Draws player 2's score
         SCORE_FONT.render_to(win, (int(WIN_WIDTH / 2) + SCORE_FONT_WIDTH, 40), str(self.score[1]), COLOUR_GREY)
 
-    def no_winner(self) -> bool:
+    def check_winner(self) -> bool:
         # When somebody has reached 5 points (won the game)
         if max(self.score[0], self.score[1]) == 5:
-            return False
+            return True
         else:
             # Enables the game loop to be run again
             self.run = True
-            return True
+            return False
 
 
 def main() -> None:
@@ -231,7 +229,7 @@ def main() -> None:
     game = Game()
 
     # Loops until somebody has scored 5 points
-    while game.no_winner() and not game.exit:
+    while not game.check_winner() and not game.exit:
         # Creates objects for both players (starting x, starting y)
         player1 = Player(PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
         player2 = Player(WIN_WIDTH - PLAYER_WIDTH - PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
