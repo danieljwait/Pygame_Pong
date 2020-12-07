@@ -17,8 +17,8 @@ except ImportError:
 
     pygame.init()
 
-from math import cos, sin
-from random import randint
+from math import cos, sin, atan
+from random import randint, uniform
 from time import perf_counter
 
 # Constants for colours
@@ -40,13 +40,14 @@ SCORE_FONT = pygame.freetype.SysFont("Courier New Bold", SCORE_FONT_SIZE)
 PLAYER_WIDTH = 10
 PLAYER_HEIGHT = 75
 PLAYER_VELOCITY = 475
-PLAYER_OFFSET = 10
+PLAYER_OFFSET = 30
 
 # Constants for the ball
 BALL_RADIUS = 5
 BALL_VELOCITY = 450
+BALL_ANGLE_MAX = atan(225/800)  # ~0.27 rad
+BALL_ANGLE_MIN = atan(40/800)  # ~0.05 rad
 PI = 3.14159  # Allows calculations using radians
-BALL_CONE = int(PI / 12 * 100)  # ~0.26 radians, cone is ~0.51 radians wide (30 degrees)
 
 
 class Player:
@@ -57,23 +58,23 @@ class Player:
 
     def draw(self, win) -> None:
         # Draws a player (surface, colour, (x, y, width, height))
-        pygame.draw.rect(win, COLOUR_WHITE, (self.x, self.y, PLAYER_WIDTH, PLAYER_HEIGHT))
+        pygame.draw.rect(win, COLOUR_WHITE, (int(self.x), int(self.y), PLAYER_WIDTH, PLAYER_HEIGHT))
 
     def move_up(self, game) -> None:
         # When moving up would move player off the screen
         # Only move to top of screen
-        if int(self.y - (PLAYER_VELOCITY * game.delta_time)) < 0:
+        if int(self.y - PLAYER_VELOCITY * game.delta_time) < 0:
             self.y = 0
         else:
-            self.y -= int(PLAYER_VELOCITY * game.delta_time)
+            self.y -= (PLAYER_VELOCITY * game.delta_time)
 
     def move_down(self, game) -> None:
         # When moving down would move player off the screen
         # Only move to bottom of screen
-        if int(self.y + PLAYER_HEIGHT + (PLAYER_VELOCITY * game.delta_time)) > WIN_HEIGHT:
+        if (self.y + PLAYER_HEIGHT + PLAYER_VELOCITY * game.delta_time) > WIN_HEIGHT:
             self.y = WIN_HEIGHT - PLAYER_HEIGHT
         else:
-            self.y += int(PLAYER_VELOCITY * game.delta_time)
+            self.y += (PLAYER_VELOCITY * game.delta_time)
 
 
 class Ball:
@@ -82,22 +83,15 @@ class Ball:
         self.x = int(WIN_WIDTH / 2)
         self.y = int(WIN_HEIGHT / 2)
 
-        # Chooses random starting angle for the ball
-        # 1.2 radian (~70 degrees) cone to the left or right
-        # https://www.desmos.com/calculator/4lj2bek1dg
-        direction = randint(0, 1)
-        if direction == 0:  # Left
-            self.angle = randint(-BALL_CONE, BALL_CONE) / 100
-        else:  # Right
-            self.angle = randint(-BALL_CONE, BALL_CONE) / 100 + PI
+        self.angle = self.generate_start_angle()
 
     def draw(self, win) -> None:
         # Draws a white circle (surface, colour, pos, radius)
-        pygame.draw.circle(win, COLOUR_WHITE, (self.x, self.y), BALL_RADIUS)
+        pygame.draw.circle(win, COLOUR_WHITE, (int(self.x), int(self.y)), BALL_RADIUS)
 
     def move(self, game, player1, player2) -> None:
-        next_x = self.x + int(BALL_VELOCITY * cos(self.angle) * game.delta_time)
-        next_y = self.y - int(BALL_VELOCITY * sin(self.angle) * game.delta_time)
+        next_x = self.x + (BALL_VELOCITY * cos(self.angle) * game.delta_time)
+        next_y = self.y - (BALL_VELOCITY * sin(self.angle) * game.delta_time)
 
         # Hitting top/bottom
         if next_y <= 0 or next_y >= WIN_HEIGHT:
@@ -105,12 +99,14 @@ class Ball:
             self.move(game, player1, player2)
 
         # Hitting player 1
-        elif next_x <= player1.x + PLAYER_WIDTH and player1.y <= self.y <= player1.y + PLAYER_HEIGHT:
+        elif player1.x <= next_x <= player1.x + PLAYER_WIDTH and player1.y <= self.y <= player1.y + PLAYER_HEIGHT:
+            self.x = player1.x + PLAYER_WIDTH
             self.angle = PI - self.angle
             self.move(game, player1, player2)
 
         # Hitting player 2
-        elif next_x >= player2.x and player2.y <= self.y <= player2.y + PLAYER_HEIGHT:
+        elif player2.x <= next_x <= player2.x + PLAYER_WIDTH and player2.y <= self.y <= player2.y + PLAYER_HEIGHT:
+            self.x = player2.x
             self.angle = PI - self.angle
             self.move(game, player1, player2)
 
@@ -128,6 +124,24 @@ class Ball:
         else:
             self.x = next_x
             self.y = next_y
+
+    @staticmethod
+    def generate_start_angle() -> float:
+        # Randomly chooses an angle in the interval [BALL_ANGLE_MAX, BALL_ANGLE_MIN]
+        # These constants were defined using the method linked below
+        # https://www.desmos.com/calculator/1hmuyvwcvv
+
+        # Quadrants are labeled 1-4 going anticlockwise starting in (+, +)
+        quadrant = randint(1, 4)
+
+        if quadrant == 1:
+            return uniform(BALL_ANGLE_MIN, BALL_ANGLE_MAX)
+        elif quadrant == 2:
+            return PI - uniform(BALL_ANGLE_MIN, BALL_ANGLE_MAX)
+        elif quadrant == 3:
+            return PI + uniform(BALL_ANGLE_MIN, BALL_ANGLE_MAX)
+        else:
+            return -uniform(BALL_ANGLE_MIN, BALL_ANGLE_MAX)
 
 
 class Game:
@@ -148,10 +162,15 @@ class Game:
             # Delta time used for consistent movement across frames
             self.get_delta_time()
 
+            # Skips ticks with exceptionally high delta times (>4x expected)
+            # Typically caused by moving the window
+            if self.delta_time > 0.04:
+                continue
+
             # The set delay between each tick/frame
             # Game has a frame time of 10ms so 100fps
-            # 1000ms / 10ms = 100fps
-            pygame.time.delay(10)
+            # 1000ms / 1ms = 1000fps
+            # pygame.time.delay(1)
 
             # Gets list of events in that tick
             for event in pygame.event.get():
@@ -231,15 +250,14 @@ def main() -> None:
     # Loops until somebody has scored 5 points
     while not game.check_winner() and not game.exit:
         # Creates objects for both players (starting x, starting y)
-        player1 = Player(PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
-        player2 = Player(WIN_WIDTH - PLAYER_WIDTH - PLAYER_OFFSET, int((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
+        player1 = Player(PLAYER_OFFSET, ((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
+        player2 = Player((WIN_WIDTH - PLAYER_WIDTH - PLAYER_OFFSET), ((WIN_HEIGHT - PLAYER_HEIGHT) / 2))
 
         # Creates object for the ball
         ball = Ball()
 
         # Game loop will run until QUIT event
         game.game_loop(win, player1, player2, ball)
-        print(game.score)
 
 
 if __name__ == '__main__':
