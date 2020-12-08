@@ -35,6 +35,10 @@ LINE_X = int(WIN_WIDTH / 2)
 SCORE_FONT_SIZE = 90  # Width = 0.5 * Size and Height = 0.75 * Size
 SCORE_FONT_WIDTH = int(SCORE_FONT_SIZE * 0.5)
 SCORE_FONT = pygame.freetype.SysFont("Courier New Bold", SCORE_FONT_SIZE)
+FPS_FONT_SIZE = 20
+FPS_FONT_Y = 2
+FPS_FONT_X = 3
+FPS_FONT = pygame.freetype.SysFont("Courier New Bold", FPS_FONT_SIZE)
 
 # Constants for the players
 PLAYER_WIDTH = 10
@@ -158,19 +162,23 @@ class Game:
         # Measures the start of the first frame to calculate the first delta time
         self.time_last = perf_counter()
 
+        # Initiates game's clock for measuring fps
+        game_clock = pygame.time.Clock()
+
         while self.run:
+            # Sets max frame rate
+            # 1s / 0.015s = 66fps
+            pygame.time.delay(15)
+            game_clock.tick()
+
             # Delta time used for consistent movement across frames
+            # ~0.015s (the set delay for each frame)
             self.get_delta_time()
 
             # Skips ticks with exceptionally high delta times (>4x expected)
             # Typically caused by moving the window
-            if self.delta_time > 0.04:
+            if self.delta_time > 0.06:
                 continue
-
-            # The set delay between each tick/frame
-            # Game has a frame time of 10ms so 100fps
-            # 1000ms / 1ms = 1000fps
-            # pygame.time.delay(1)
 
             # Gets list of events in that tick
             for event in pygame.event.get():
@@ -203,6 +211,8 @@ class Game:
             pygame.draw.line(win, COLOUR_GREY, (LINE_X, 0), (LINE_X, WIN_HEIGHT))
             # Draws the score
             self.draw_score(win)
+            # Draws the fps
+            self.draw_fps(win, game_clock)
             # Draws the players
             player1.draw(win)
             player2.draw(win)
@@ -236,6 +246,11 @@ class Game:
             # Enables the game loop to be run again
             self.run = True
             return False
+
+    @staticmethod
+    def draw_fps(win, clock) -> None:
+        # Gets the fps, casts to int and renders to the screen
+        FPS_FONT.render_to(win, (FPS_FONT_X, FPS_FONT_Y), str(int(clock.get_fps())).zfill(3) + "fps", COLOUR_GREY)
 
 
 def main() -> None:
